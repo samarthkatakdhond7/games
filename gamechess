@@ -1,0 +1,157 @@
+import pygame
+
+# --- CONSTANTS ---
+# Screen dimensions
+WIDTH, HEIGHT = 800, 800
+# Board dimensions
+BOARD_ROWS, BOARD_COLS = 8, 8
+SQ_SIZE = WIDTH // BOARD_COLS
+
+# Colors
+LIGHT_BROWN = (240, 217, 181)
+DARK_BROWN = (181, 136, 99)
+HIGHLIGHT_COLOR = (255, 255, 0, 128) # Yellow with transparency
+
+# --- PIECE REPRESENTATION ---
+# We'll use a 2D list (list of lists) to represent the board.
+# 'w' for white, 'b' for black. R, N, B, Q, K, P for piece types.
+# '--' for an empty square.
+
+class Game:
+    def __init__(self):
+        self.board = [
+            ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+            ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
+            ['--', '--', '--', '--', '--', '--', '--', '--'],
+            ['--', '--', '--', '--', '--', '--', '--', '--'],
+            ['--', '--', '--', '--', '--', '--', '--', '--'],
+            ['--', '--', '--', '--', '--', '--', '--', '--'],
+            ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
+            ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+        ]
+        self.images = self.load_images()
+        self.turn = 'white' # white or black
+        self.selected_piece = None # Will store (row, col) of the selected piece
+        self.valid_moves = []
+
+    def load_images(self):
+        """Loads all piece images from the 'images' folder."""
+        pieces = ['wR', 'wN', 'wB', 'wQ', 'wK', 'wP',
+                  'bR', 'bN', 'bB', 'bQ', 'bK', 'bP']
+        images = {}
+        for piece in pieces:
+            try:
+                images[piece] = pygame.transform.scale(pygame.image.load(f'images/{piece}.png'), (SQ_SIZE, SQ_SIZE))
+            except pygame.error as e:
+                print(f"Error loading image for {piece}: {e}")
+                # Create a placeholder surface if image is missing
+                images[piece] = pygame.Surface((SQ_SIZE, SQ_SIZE))
+                images[piece].fill((255,0,0)) # Red square for missing piece
+        return images
+
+    def draw_board(self, screen):
+        """Draws the 8x8 chess board."""
+        for row in range(BOARD_ROWS):
+            for col in range(BOARD_COLS):
+                color = LIGHT_BROWN if (row + col) % 2 == 0 else DARK_BROWN
+                pygame.draw.rect(screen, color, (col * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+    def draw_pieces(self, screen):
+        """Draws the pieces on the board based on the self.board state."""
+        for row in range(BOARD_ROWS):
+            for col in range(BOARD_COLS):
+                piece = self.board[row][col]
+                if piece != '--':
+                    screen.blit(self.images[piece], (col * SQ_SIZE, row * SQ_SIZE))
+
+    def draw_highlight(self, screen):
+        """Highlights the selected square."""
+        if self.selected_piece:
+            row, col = self.selected_piece
+            # Create a transparent surface
+            s = pygame.Surface((SQ_SIZE, SQ_SIZE))
+            s.set_alpha(128)  # Set transparency
+            s.fill(HIGHLIGHT_COLOR[:3]) # Fill with highlight color
+            screen.blit(s, (col * SQ_SIZE, row * SQ_SIZE))
+
+    def handle_click(self, pos):
+        """Handles mouse clicks to select and move pieces."""
+        x, y = pos
+        col = x // SQ_SIZE
+        row = y // SQ_SIZE
+
+        # If a piece is already selected
+        if self.selected_piece:
+            self.move_piece(row, col)
+        else:
+            # Select a piece
+            piece = self.board[row][col]
+            if piece != '--':
+                # Check if it's the correct player's turn
+                if (self.turn == 'white' and piece[0] == 'w') or (self.turn == 'black' and piece[0] == 'b'):
+                    self.selected_piece = (row, col)
+                else:
+                    print("Not your turn!")
+            else:
+                self.selected_piece = None
+
+    def move_piece(self, end_row, end_col):
+        """Moves the selected piece to the new position."""
+        start_row, start_col = self.selected_piece
+        piece = self.board[start_row][start_col]
+        end_piece = self.board[end_row][end_col]
+
+        # --- BASIC MOVE VALIDATION ---
+        # For this simple version, we'll only check a few things.
+        # 1. You can't capture your own piece.
+        if end_piece != '--' and piece[0] == end_piece[0]:
+            print("Invalid move: Cannot capture your own piece.")
+            self.selected_piece = None # Deselect
+            return
+
+        # --- TODO: Add proper chess rules here (e.g., pawn moves, knight moves, check, etc.) ---
+        # For now, we allow any move that doesn't capture your own piece.
+
+        # Make the move
+        self.board[end_row][end_col] = piece
+        self.board[start_row][start_col] = '--'
+
+        # Switch turns
+        self.turn = 'black' if self.turn == 'white' else 'white'
+        print(f"Turn: {self.turn.capitalize()}")
+
+        # Deselect the piece after moving
+        self.selected_piece = None
+
+
+def main():
+    """Main function to run the game."""
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption('Python Chess')
+    clock = pygame.time.Clock()
+    game = Game()
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1: # Left click
+                    game.handle_click(event.pos)
+
+        # --- DRAWING ---
+        game.draw_board(screen)
+        game.draw_highlight(screen)
+        game.draw_pieces(screen)
+
+        pygame.display.flip()
+
+        # Limit the frame rate
+        clock.tick(60)
+
+    pygame.quit()
+
+if __name__ == '__main__':
+    main()
